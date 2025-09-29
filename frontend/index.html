@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EchoNote 🎙️</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>EchoNote 🎙️</h1>
+      <p>Turn your lectures into clean, structured notes.</p>
+    </header>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="upload">📂 Upload</button>
+      <button class="tab-btn" data-tab="record">🎤 Record</button>
+    </div>
+
+    <!-- Upload Section -->
+    <section id="upload" class="card tab-content active">
+      <h2>📂 Upload Audio File</h2>
+      <input type="file" id="fileInput" accept="audio/*">
+      <button id="uploadBtn">Upload & Process</button>
+
+      <div class="results">
+        <h3>📜 Transcript</h3>
+        <pre id="transcript">...</pre>
+
+        <h3>📝 Notes</h3>
+        <pre id="notes">...</pre>
+      </div>
+    </section>
+
+    <!-- Live Recording Section -->
+    <section id="record" class="card tab-content">
+      <h2>🎤 Live Recording</h2>
+      <button id="recordBtn">🎙️ Record</button>
+      <button id="stopBtn" disabled>⏹️ Stop Recording</button>
+      <p id="statusMsg"></p>
+
+      <div class="results">
+        <h3>Live Transcript</h3>
+        <pre id="liveTranscript">...</pre>
+
+        <h3>Final Notes</h3>
+        <pre id="finalNotes">...</pre>
+      </div>
+    </section>
+
+    <!-- Unified Download buttons (always available) -->
+    <div class="downloads">
+      <a id="downloadTranscriptBtn" style="display:none;" class="btn">⬇️ Download Transcript</a>
+      <a id="downloadNotesBtn" style="display:none;" class="btn">⬇️ Download Notes</a>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    // Tab switching logic
+    const tabButtons = document.querySelectorAll(".tab-btn");
+    const tabContents = document.querySelectorAll(".tab-content");
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        tabButtons.forEach(b => b.classList.remove("active"));
+        tabContents.forEach(tc => tc.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(btn.dataset.tab).classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+/* Global */
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #121212;
+  color: #eee;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 1rem;
+}
+
+/* Header */
+header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+header h1 {
+  font-size: 2.2rem;
+  color: #fff;
+}
+header p {
+  color: #aaa;
+  font-size: 1.1rem;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+.tab-btn {
+  flex: 1;
+  background: #1e1e1e;
+  color: #bbb;
+  border: none;
+  padding: 0.8rem;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.tab-btn.active {
+  background: #3a82f7;
+  color: #fff;
+}
+.tab-btn:hover:not(.active) {
+  background: #2a2a2a;
+}
+
+/* Card */
+.card {
+  background: #1e1e1e;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.4);
+}
+
+/* Tab Content */
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
+
+/* Buttons */
+button, .btn {
+  background: #3a82f7;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  margin-top: 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  display: inline-block;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+button:hover, .btn:hover {
+  background: #2563eb;
+}
+button:disabled {
+  background: #444;
+  cursor: not-allowed;
+}
+
+/* Results */
+.results {
+  margin-top: 1rem;
+}
+
+pre {
+  background: #2a2a2a;
+  padding: 1rem;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: #eee;
+  margin-bottom: 1rem;
+}
+
+/* Downloads */
+.downloads {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+/* Loading spinner */
+.loading {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #444;
+  border-top: 2px solid #3a82f7;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
