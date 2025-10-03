@@ -6,6 +6,8 @@ from flask_cors import CORS
 from pipeline import generate_transcript, generate_notes_from_transcript, process_audio
 from stt_engine import transcribe_audio
 from werkzeug.utils import secure_filename
+import shutil
+import time
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="/")
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True, methods=["GET", "POST", "OPTIONS"])
@@ -26,6 +28,22 @@ def frontend_files(filename):
     return send_from_directory(app.static_folder, filename)
 
 # ==== Live streaming endpoint ====
+def ffmpeg_concat_wavs(wav_paths, out_path):
+    list_file = out_path + "_inputs.txt"
+    with open(list_file, "w", encoding="utf-8") as f:
+        for p in wav_paths:
+            f.write(f"file '{p}'\n")
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "concat", "-safe", "0", "-i", list_file,
+        "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
+        out_path
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    os.remove(list_file)
+    if result.returncode != 0:
+        raise RuntimeError("ffmpeg concat failed: " + result.stderr)
+    return out_path
 @app.route("/stream", methods=["POST", "OPTIONS"])
 def stream_audio():
     if request.method == "OPTIONS":
@@ -36,55 +54,79 @@ def stream_audio():
 
     file = request.files["file"]
     final = request.form.get("final", "false").lower() == "true"
+    session_id = request.form.get("session_id") or "default_session"
+
+    # create session-specific folder
+    session_dir = os.path.join(app.config["UPLOAD_FOLDER"], session_id)
+    os.makedirs(session_dir, exist_ok=True)
 
     # Save incoming .webm chunk
-    temp_id = str(uuid.uuid4())
-    temp_webm = os.path.join(app.config["UPLOAD_FOLDER"], f"chunk_{temp_id}.webm")
+    temp_uuid = str(uuid.uuid4())
+    temp_webm = os.path.join(session_dir, f"chunk_{temp_uuid}.webm")
     file.save(temp_webm)
 
     # Convert webm → wav (16kHz mono PCM)
-    temp_wav = os.path.join(app.config["UPLOAD_FOLDER"], f"chunk_{temp_id}.wav")
+    temp_wav = os.path.join(session_dir, f"chunk_{temp_uuid}.wav")
     result = subprocess.run([
         "ffmpeg", "-y", "-i", temp_webm,
         "-ar", "16000", "-ac", "1", temp_wav
     ], capture_output=True, text=True)
-    
-    if result.returncode != 0 or not os.path.exists(temp_wav):
-        # Clean up
+
+    # remove webm immediately
+    try:
         os.remove(temp_webm)
+    except:
+        pass
+
+    if result.returncode != 0 or not os.path.exists(temp_wav):
         return jsonify({"error": "ffmpeg conversion failed", "details": result.stderr}), 500
 
+    # Keep per-session state in app.config
+    sess_key = f"stream_{session_id}"
+    if sess_key not in app.config:
+        app.config[sess_key] = {"chunks": [], "transcript_so_far": ""}
 
-    # Append wav data to session file
-    if not os.path.exists(SESSION_FILE) or final:
-        open(SESSION_FILE, "wb").close()
-
-    with open(temp_wav, "rb") as src, open(SESSION_FILE, "ab") as dst:
-        dst.write(src.read())
-
-    os.remove(temp_webm)
-    os.remove(temp_wav)
-
-    if final:
+    # Transcribe just this chunk (fast, single-file)
+    try:
+        chunk_text = transcribe_audio(temp_wav, save_path=None)
+    except Exception as e:
+        # if stt fails, remove the temp wav and return error
         try:
-            # Step 1: Transcript immediately
-            transcript = generate_transcript(SESSION_FILE)
-    
-            request_id = str(uuid.uuid4())
-            app.config[request_id] = {"filepath": SESSION_FILE, "transcript": transcript}
-    
-            # Clear session for next recording
-            open(SESSION_FILE, "wb").close()
-            if hasattr(stream_audio, "last_len"):
-                del stream_audio.last_len
-    
-            return jsonify({"request_id": request_id, "transcript": transcript})
-        except Exception as e:
-            import traceback, sys
-            print("=== ERROR in process_audio ===", file=sys.stderr)
-            traceback.print_exc()
-            print("=== END ERROR ===", file=sys.stderr)
-            return jsonify({"error": "processing_failed", "details": str(e)}), 500
+            os.remove(temp_wav)
+        except:
+            pass
+        return jsonify({"error": "stt_failed", "details": str(e)}), 500
+
+    # Save chunk path for concatenation later
+    app.config[sess_key]["chunks"].append(temp_wav)
+    # Append to transcript_so_far (simple approach)
+    app.config[sess_key]["transcript_so_far"] = (app.config[sess_key]["transcript_so_far"] + " " + chunk_text).strip()
+
+    if not final:
+        # For non-final chunks: return the immediate chunk transcription
+        return jsonify({"partial": chunk_text})
+
+    # FINAL CHUNK: concatenate and run the full pipeline
+    try:
+        full_out = os.path.join(session_dir, f"{session_id}_full.wav")
+        ffmpeg_concat_wavs(app.config[sess_key]["chunks"], full_out)
+
+        # Option A: run your pipeline/process to produce transcript + notes
+        transcript = generate_transcript(full_out)  # saves transcript if pipeline does
+        request_id = str(uuid.uuid4())
+        app.config[request_id] = {"filepath": full_out, "transcript": transcript}
+
+        # cleanup chunk WAVs (keep final for storage if desired)
+        for p in app.config[sess_key]["chunks"]:
+            try:
+                os.remove(p)
+            except:
+                pass
+        del app.config[sess_key]
+
+        return jsonify({"request_id": request_id, "transcript": transcript})
+    except Exception as e:
+        return jsonify({"error": "processing_failed", "details": str(e)}), 500
 
     
 

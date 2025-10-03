@@ -1,6 +1,7 @@
 // ==== File Upload Handling ====
 const uploadBtn = document.getElementById("uploadBtn");
 const fileInput = document.getElementById("fileInput");
+let sessionId = null;
 
 // Helper: prepare download buttons
 function prepareDownload(buttonId, content, filename) {
@@ -81,6 +82,8 @@ let chunkInterval;
 
 recordBtn.addEventListener("click", async () => {
   try {
+    sessionId = crypto.randomUUID();           // <-- new: unique session id per recording
+    window.currentSessionId = sessionId;
     globalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
     // MIME type fallback
@@ -112,10 +115,15 @@ recordBtn.addEventListener("click", async () => {
       const chunk = chunkQueue.shift();
       const formData = new FormData();
       formData.append("file", chunk, "chunk.webm");
+      formData.append("session_id", sessionId);   // <-- send session id
       fetch("http://127.0.0.1:5000/stream", { method: "POST", body: formData })
         .then(res => res.json())
         .then(data => {
-          if (data.partial) liveTranscriptEl.textContent += data.partial;
+          // server will return {"partial": "..."} for non-final chunks
+          if (data.partial) {
+            // append partial with small spacing
+            liveTranscriptEl.textContent += (data.partial + " ");
+          }
         })
         .catch(err => console.error("Chunk upload failed:", err));
     }, 2000);
@@ -142,6 +150,7 @@ stopBtn.addEventListener("click", async () => {
   const formData = new FormData();
   formData.append("file", finalBlob, "final.webm");
   formData.append("final", "true");
+  formData.append("session_id", sessionId);
 
   liveTranscriptEl.innerHTML += '\n\n<span class="loading"></span> Finalizing transcript...';
   finalNotesEl.innerHTML = "";

@@ -1,8 +1,8 @@
 import whisper
 import os
 
-# Load model once globally (avoid reloading on every call)
-model = whisper.load_model("base")  # try "small" or "medium" for better accuracy
+MODEL_NAME = os.environ.get("WHISPER_MODEL", "small")
+model = whisper.load_model(MODEL_NAME)
 
 def transcribe_audio(audio_path, save_path=None):
     """
@@ -10,14 +10,15 @@ def transcribe_audio(audio_path, save_path=None):
     - If save_path is given: saves transcript and returns it.
     - If not: just returns transcript (used for live/partial updates).
     """
+    # for faster realtime behavior, you can pass additional whisper args later
     result = model.transcribe(audio_path)
-    transcript = result["text"]
+    transcript = result.get("text", "").strip()
 
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         with open(save_path, "w", encoding="utf-8") as f:
             f.write(transcript)
-
+            
     return transcript
 
 if __name__ == "__main__":
